@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sushimi}
+      POSTGRES_USER: ${POSTGRES_USER:-sushimi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sushimi}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  object-storage:
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-sushimi}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-sushimi-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-sushimi-media}
+    ports:
+      - "127.0.0.1:8333:8333"
+      - "127.0.0.1:9333:9333"
+    volumes:
+      - media_data:/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sushimi}:${POSTGRES_PASSWORD:-sushimi}@postgres:5432/${POSTGRES_DB:-sushimi}
+      S3_ENDPOINT: http://object-storage:8333
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-sushimi-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-sushimi}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-sushimi-local-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      object-storage:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  media_data:
+  caddy_data:
+  caddy_config:

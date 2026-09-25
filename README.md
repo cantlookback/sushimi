@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sushimi
 
-## Getting Started
+Платформа сайта и CRM для локальной доставки суши. Проект строится как модульный монолит на Next.js, TypeScript и PostgreSQL.
 
-First, run the development server:
+## Локальная разработка
 
-```bash
+```powershell
+Copy-Item .env.example .env.local
+docker compose up -d postgres object-storage
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Витрина: http://localhost:3000
+- Каркас CRM: http://localhost:3000/admin
+- Проверка процесса: http://localhost:3000/api/health
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`db:seed` нужен только для первоначального демонстрационного наполнения. Не запускайте его в рабочей базе: удалённые демонстрационные позиции будут созданы повторно.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Витрина читает меню из PostgreSQL. Оформленный заказ проходит серверную проверку, сохраняется вместе со снимком названий и цен и сразу появляется в CRM. Архитектурные решения описаны в `docs/architecture.md`.
 
-## Learn More
+## CRM
 
-To learn more about Next.js, take a look at the following resources:
+- `/admin/orders` — живая доска кухни и выдачи со статусами заказов.
+- `/admin/customers` — клиенты, повторные покупки, средний чек и сегменты.
+- `/admin/analytics` — выручка, популярные позиции и способы получения.
+- `/admin/catalog` — товары, фотографии, цены и оперативный стоп-лист.
+- `/admin/ingredients` — закупочные цены, упаковки и ингредиенты для расчёта себестоимости.
+- `/admin/settings` — параметры магазина, заказов и доставки.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+CRM пока работает в демонстрационном режиме без авторизации. До размещения в интернете административные маршруты и API необходимо закрыть сессиями и проверкой ролей.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Изображения
 
-## Deploy on Vercel
+Фотографии товаров загружаются из CRM в локальное S3-совместимое хранилище SeaweedFS. В PostgreSQL сохраняется только ключ объекта, а сами файлы находятся в Docker volume `media_data` и переживают обычные перезапуски контейнеров.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Для production достаточно изменить переменные `S3_*` на реквизиты облачного S3-хранилища. Код загрузки и данные товаров менять не потребуется. Не используйте `docker compose down -v`, если хотите сохранить локальную базу и изображения.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Развёртывание на сервере
+
+На сервере нужны Docker Engine, Docker Compose, открытые порты `80` и `443`, а также DNS-запись домена на IP сервера.
+
+```bash
+cp .env.production.example .env
+# Укажите домен и замените пароли в .env
+docker compose up -d --build
+docker compose ps
+docker compose logs -f app caddy
+```
+
+Контейнер `app` перед каждым запуском автоматически применяет только новые миграции. Seed автоматически не запускается. Caddy получает и обновляет HTTPS-сертификат, если `SITE_ADDRESS` содержит домен. Для первого запуска по IP задайте `SITE_ADDRESS=http://SERVER_IP`.
+
+Обновление приложения:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Резервная копия PostgreSQL и загруженных изображений:
+
+```bash
+sh scripts/backup.sh
+```
+
+Архивы появятся в `./backups`. Храните их не только на самом сервере.
