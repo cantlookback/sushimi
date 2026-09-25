@@ -19,7 +19,7 @@ export const categories = pgTable("categories", {
 }, (table) => [uniqueIndex("categories_slug_unique").on(table.slug)]);
 
 export const products = pgTable("products", {
-  id: uuid("id").primaryKey().defaultRandom(), categoryId: uuid("category_id").notNull().references(() => categories.id), name: varchar("name", { length: 160 }).notNull(), slug: varchar("slug", { length: 180 }).notNull(), description: text("description").notNull().default(""), price: integer("price").notNull(), weightGrams: integer("weight_grams"), imageKey: text("image_url"), badges: jsonb("badges").$type<string[]>().notNull().default([]), available: boolean("available").notNull().default(true), sortOrder: integer("sort_order").notNull().default(0), ...auditColumns,
+  id: uuid("id").primaryKey().defaultRandom(), categoryId: uuid("category_id").notNull().references(() => categories.id), name: varchar("name", { length: 160 }).notNull(), slug: varchar("slug", { length: 180 }).notNull(), description: text("description").notNull().default(""), price: integer("price").notNull(), weightGrams: integer("weight_grams"), caloriesKcal: integer("calories_kcal"), piecesCount: integer("pieces_count"), includedItems: jsonb("included_items").$type<string[]>().notNull().default([]), imageKey: text("image_url"), badges: jsonb("badges").$type<string[]>().notNull().default([]), available: boolean("available").notNull().default(true), sortOrder: integer("sort_order").notNull().default(0), ...auditColumns,
 }, (table) => [uniqueIndex("products_slug_unique").on(table.slug)]);
 
 export const ingredients = pgTable("ingredients", {

@@ -7,6 +7,10 @@ export type Product = {
   description: string;
   price: number;
   weightGrams: number;
+  caloriesKcal: number | null;
+  piecesCount: number | null;
+  composition: string[];
+  includedItems: string[];
   imageUrl: string;
   badges: string[];
   available: boolean;

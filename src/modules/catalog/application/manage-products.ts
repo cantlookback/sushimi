@@ -10,6 +10,9 @@ export const productInputSchema = z.object({
   description: z.string().trim().max(2000).default(""),
   price: z.number().int().nonnegative(),
   weightGrams: z.number().int().positive().nullable(),
+  caloriesKcal: z.number().int().nonnegative().nullable(),
+  piecesCount: z.number().int().positive().nullable(),
+  includedItems: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
   badges: z.array(z.string().trim().min(1).max(30)).max(5).default([]),
   available: z.boolean().default(true),
 });

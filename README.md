@@ -6,12 +6,14 @@
 
 ```powershell
 Copy-Item .env.example .env.local
-docker compose up -d postgres object-storage
-npm run db:generate
+npm ci
+docker compose --env-file .env.local up -d
 npm run db:migrate
 npm run db:seed
 npm run dev
 ```
+
+Локальный `docker-compose.yml` запускает только PostgreSQL и SeaweedFS. Next.js работает напрямую на компьютере через `npm run dev`, поэтому изменения кода сразу появляются в браузере. `db:seed` выполняется только один раз для тестового наполнения. При следующих запусках достаточно выполнить `docker compose --env-file .env.local up -d` и `npm run dev`. Остановить локальную инфраструктуру можно командой `docker compose down`.
 
 - Витрина: http://localhost:3000
 - Каркас CRM: http://localhost:3000/admin
@@ -45,18 +47,19 @@ CRM пока работает в демонстрационном режиме �
 ```bash
 cp .env.production.example .env
 # Укажите домен и замените пароли в .env
-docker compose up -d --build
-docker compose ps
-docker compose logs -f app caddy
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f app caddy
 ```
 
-Контейнер `app` перед каждым запуском автоматически применяет только новые миграции. Seed автоматически не запускается. Caddy получает и обновляет HTTPS-сертификат, если `SITE_ADDRESS` содержит домен. Для первого запуска по IP задайте `SITE_ADDRESS=http://SERVER_IP`.
+Production использует отдельный `docker-compose.prod.yml` и готовый образ из `APP_IMAGE`. Контейнер `app` перед каждым запуском автоматически применяет только новые миграции и создаёт пустые базовые настройки доставки, если база новая. Seed и демонстрационные товары автоматически не запускаются. Caddy получает и обновляет HTTPS-сертификат, если `SITE_ADDRESS` содержит домен. Для первого запуска по IP задайте `SITE_ADDRESS=http://SERVER_IP`.
 
 Обновление приложения:
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml pull app
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Резервная копия PostgreSQL и загруженных изображений:
@@ -66,3 +69,23 @@ sh scripts/backup.sh
 ```
 
 Архивы появятся в `./backups`. Храните их не только на самом сервере.
+
+## Перенос локальных данных на сервер
+
+Экспортируйте локальную PostgreSQL-базу и фотографии из корня проекта:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/export-local-data.ps1
+scp -r backups/local-transfer root@SERVER_IP:/home/sushimi/local-transfer
+```
+
+На сервере выполните импорт:
+
+```bash
+cd /home/sushimi
+sh scripts/import-production-data.sh --confirm-replace /home/sushimi/local-transfer
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail=100 app
+```
+
+Импорт полностью заменяет production-базу локальной. Перед заменой скрипт автоматически сохраняет текущую базу и медиа в `./backups`. Медиаархив нужен обязательно: без него записи товаров перенесутся, но их фотографии не будут доступны.
