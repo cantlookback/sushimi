@@ -21,13 +21,21 @@ if ($LASTEXITCODE -ne 0) { throw "PostgreSQL export failed." }
 docker @compose cp postgres:/tmp/sushimi-local.dump (Join-Path $resolvedOutput "database.dump")
 if ($LASTEXITCODE -ne 0) { throw "Could not copy PostgreSQL dump." }
 
-docker @compose exec -T object-storage sh -c 'tar -czf /tmp/sushimi-media.tar.gz -C /data .'
-if ($LASTEXITCODE -ne 0) { throw "Media export failed." }
-docker @compose cp object-storage:/tmp/sushimi-media.tar.gz (Join-Path $resolvedOutput "media.tar.gz")
-if ($LASTEXITCODE -ne 0) { throw "Could not copy media archive." }
+docker @compose stop object-storage
+if ($LASTEXITCODE -ne 0) { throw "Could not stop local object storage for a consistent export." }
+try {
+    $mediaArchive = Join-Path $resolvedOutput "media.tar.gz"
+    docker @compose run --rm --no-deps -T --volume "${resolvedOutput}:/transfer" --entrypoint tar object-storage -czf /transfer/media.tar.gz -C /data .
+    if ($LASTEXITCODE -ne 0) { throw "Media export failed." }
+    if (-not (Test-Path -LiteralPath $mediaArchive) -or (Get-Item -LiteralPath $mediaArchive).Length -eq 0) {
+        throw "Media archive was not created or is empty."
+    }
+}
+finally {
+    docker @compose up -d object-storage
+}
 
 docker @compose exec -T postgres rm -f /tmp/sushimi-local.dump
-docker @compose exec -T object-storage rm -f /tmp/sushimi-media.tar.gz
 
 Write-Host "Export created: $resolvedOutput"
 Write-Host "Files: database.dump, media.tar.gz"
