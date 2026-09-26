@@ -40,6 +40,8 @@ services:
         condition: service_healthy
       object-storage:
         condition: service_started
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
@@ -47,25 +49,6 @@ services:
       retries: 10
       start_period: 20s
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS must be set}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      app:
-        condition: service_healthy
-
 volumes:
   postgres_data:
   media_data:
-  caddy_data:
-  caddy_config:

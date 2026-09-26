@@ -42,18 +42,30 @@ CRM пока работает в демонстрационном режиме �
 
 ## Развёртывание на сервере
 
-На сервере нужны Docker Engine, Docker Compose, открытые порты `80` и `443`, а также DNS-запись домена на IP сервера.
+На сервере нужны Docker Engine, Docker Compose, Nginx, открытые порты `80` и `443`, а также DNS-запись домена на IP сервера. Контейнер приложения публикуется только на `127.0.0.1:3000`; PostgreSQL и хранилище наружу не открываются.
 
 ```bash
 cp .env.production.example .env
-# Укажите домен и замените пароли в .env
+# Замените пароли в .env
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f app caddy
+docker compose -f docker-compose.prod.yml logs -f app
 ```
 
-Production использует отдельный `docker-compose.prod.yml` и готовый образ из `APP_IMAGE`. Контейнер `app` перед каждым запуском автоматически применяет только новые миграции и создаёт пустые базовые настройки доставки, если база новая. Seed и демонстрационные товары автоматически не запускаются. Caddy получает и обновляет HTTPS-сертификат, если `SITE_ADDRESS` содержит домен. Для первого запуска по IP задайте `SITE_ADDRESS=http://SERVER_IP`.
+Production использует отдельный `docker-compose.prod.yml` и готовый образ из `APP_IMAGE`. Контейнер `app` перед каждым запуском автоматически применяет только новые миграции и создаёт пустые базовые настройки доставки, если база новая. Seed и демонстрационные товары автоматически не запускаются.
+
+Готовый Nginx-конфиг находится в `deploy/nginx/sushimi.conf`. При необходимости замените в нём домен, затем установите и включите конфигурацию:
+
+```bash
+cp deploy/nginx/sushimi.conf /etc/nginx/sites-available/sushimi
+ln -s /etc/nginx/sites-available/sushimi /etc/nginx/sites-enabled/sushimi
+nginx -t
+systemctl reload nginx
+certbot --nginx -d sushimitest.ru -d www.sushimitest.ru
+```
+
+Если порт `3000` занят, измените `APP_PORT` в `.env` и тот же порт в `proxy_pass` Nginx.
 
 Обновление приложения:
 
@@ -89,3 +101,28 @@ docker compose -f docker-compose.prod.yml logs --tail=100 app
 ```
 
 Импорт полностью заменяет production-базу локальной. Перед заменой скрипт автоматически сохраняет текущую базу и медиа в `./backups`. Медиаархив нужен обязательно: без него записи товаров перенесутся, но их фотографии не будут доступны.
+
+## Перенос production на другой сервер
+
+На старом сервере создайте согласованную копию PostgreSQL и фотографий:
+
+```bash
+cd /home/sushimi
+sh scripts/backup.sh /tmp/sushimi-transfer
+scp -r /tmp/sushimi-transfer root@NEW_SERVER_IP:/home/sushimi/transfer
+```
+
+На новом сервере сначала разместите проект и заполните `.env`, затем поднимите инфраструктуру и восстановите файлы, подставив фактические имена с временной меткой:
+
+```bash
+cd /home/sushimi
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d postgres object-storage
+sh scripts/restore-production-backup.sh --confirm-replace \
+  transfer/database-YYYYMMDD-HHMMSS.sql.gz \
+  transfer/media-YYYYMMDD-HHMMSS.tar.gz
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail=100 app
+```
+
+После проверки нового сервера переключите DNS-запись домена на его IP и установите HTTPS-сертификат через Certbot. Старый сервер не выключайте до проверки сайта, CRM, изображений и создания тестового заказа.
