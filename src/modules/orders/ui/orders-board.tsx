@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bike, Clock3, MapPin, Phone, Store } from "lucide-react";
 import type { OrderStatus } from "../domain/order";
+import { withBasePath } from "@/shared/lib/base-path";
 
 export type BoardOrder = {
   id: string;
@@ -57,7 +58,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: BoardOrder[] }) 
   async function changeStatus(order: BoardOrder, status: OrderStatus) {
     setPendingId(order.id);
     setError("");
-    const response = await fetch(`/api/admin/orders/${order.id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    const response = await fetch(withBasePath(`/api/admin/orders/${order.id}/status`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
     const payload = await response.json();
     if (!response.ok) setError(payload.error ?? "Не удалось изменить статус.");
     else setOrders((current) => status === "completed" || status === "cancelled" ? current.filter((item) => item.id !== order.id) : current.map((item) => item.id === order.id ? { ...item, status } : item));

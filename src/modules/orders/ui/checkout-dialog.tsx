@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { CheckCircle2, Minus, Plus, ShoppingBag, X } from "lucide-react";
 import type { Product } from "@/modules/catalog/domain/product";
+import { withBasePath } from "@/shared/lib/base-path";
 
 type ExtraGroup = { id: string; name: string };
 type Props = {
@@ -42,7 +43,7 @@ export function CheckoutDialog({ open, products, quantities, extraGroups, delive
     setPending(true); setError("");
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/orders", {
+      const response = await fetch(withBasePath("/api/orders"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

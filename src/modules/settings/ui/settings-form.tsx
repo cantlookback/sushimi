@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { Clock3, MapPinned, Save, Settings2, Store } from "lucide-react";
 import type { PlatformSettings } from "../domain/platform-settings";
+import { withBasePath } from "@/shared/lib/base-path";
 
 const inputClass = "w-full cursor-text rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm outline-none transition hover:border-zinc-300 focus:border-[#df3c2f] focus:ring-4 focus:ring-red-500/10";
 
@@ -23,7 +24,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: PlatformSet
       ordering: { acceptingOrders, deliveryPreparationMinutes: Number(data.get("deliveryPreparationMinutes")), pickupPreparationMinutes: Number(data.get("pickupPreparationMinutes")) },
       delivery: { zoneId: initialSettings.delivery.zoneId, name: String(data.get("zoneName")), deliveryPrice: rubles("deliveryPrice"), minimumOrder: rubles("minimumOrder"), freeDeliveryFrom: freeDelivery ? Math.round(Number(freeDelivery) * 100) : null },
     };
-    const response = await fetch("/api/admin/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const response = await fetch(withBasePath("/api/admin/settings"), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const result = await response.json();
     setMessage(response.ok ? { type: "success", text: "Настройки сохранены и уже применяются." } : { type: "error", text: result.error ?? "Не удалось сохранить настройки." });
     setPending(false);

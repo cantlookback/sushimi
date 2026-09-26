@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { ChangeEvent, ClipboardEvent, FormEvent, useMemo, useState } from "react";
 import { Calculator, Eye, EyeOff, ImagePlus, PackageOpen, Pencil, Plus, Trash2, X } from "lucide-react";
+import { withBasePath } from "@/shared/lib/base-path";
 
 type Category = { id: string; name: string };
 type AdminProduct = { id: string; categoryId: string; name: string; description: string; price: number; weightGrams: number | null; caloriesKcal: number | null; piecesCount: number | null; includedItems: string[]; badges: string[]; available: boolean; imageUrl: string };
@@ -61,7 +62,7 @@ export function CatalogManager({ categories, initialProducts, ingredients, initi
 
   async function toggle(product: AdminProduct) {
     setPendingId(product.id); setError("");
-    const response = await fetch(`/api/admin/products/${product.id}/availability`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ available: !product.available }) });
+    const response = await fetch(withBasePath(`/api/admin/products/${product.id}/availability`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ available: !product.available }) });
     const payload = await response.json();
     if (!response.ok) setError(payload.error ?? "Не удалось изменить товар.");
     else setProducts((current) => current.map((item) => item.id === product.id ? { ...item, available: payload.product.available } : item));
@@ -72,12 +73,12 @@ export function CatalogManager({ categories, initialProducts, ingredients, initi
     event.preventDefault(); setSaving(true); setError("");
     const payload = { categoryId: draft.categoryId, name: draft.name, description: draft.description, price: Math.round(Number(draft.priceRubles.replace(",", ".")) * 100), weightGrams: draft.weightGrams ? Number(draft.weightGrams) : null, caloriesKcal: draft.caloriesKcal ? Number(draft.caloriesKcal) : null, piecesCount: draft.piecesCount ? Number(draft.piecesCount) : null, includedItems: draft.includedItems.split(",").map((item) => item.trim()).filter(Boolean), badges: draft.badges.split(",").map((item) => item.trim()).filter(Boolean), available: draft.available };
     try {
-      const response = await fetch(editing ? `/api/admin/products/${editing.id}` : "/api/admin/products", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await fetch(withBasePath(editing ? `/api/admin/products/${editing.id}` : "/api/admin/products"), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Не удалось сохранить товар.");
       let saved: AdminProduct = result.product;
       const recipe = recipeDraft.map((row) => ({ ingredientId: row.ingredientId, quantity: Number(row.quantity) }));
-      const recipeResponse = await fetch(`/api/admin/products/${saved.id}/recipe`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(recipe) });
+      const recipeResponse = await fetch(withBasePath(`/api/admin/products/${saved.id}/recipe`), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(recipe) });
       if (!recipeResponse.ok) {
         setProducts((current) => editing ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved]); setEditing(saved);
         throw new Error((await recipeResponse.json()).error ?? "Товар сохранён, но рецептура не сохранилась.");
@@ -85,7 +86,7 @@ export function CatalogManager({ categories, initialProducts, ingredients, initi
       setRecipes((current) => ({ ...current, [saved.id]: recipe }));
       if (image) {
         const form = new FormData(); form.set("image", image);
-        const imageResponse = await fetch(`/api/admin/products/${saved.id}/image`, { method: "POST", body: form });
+        const imageResponse = await fetch(withBasePath(`/api/admin/products/${saved.id}/image`), { method: "POST", body: form });
         const imageResult = await imageResponse.json();
         if (!imageResponse.ok) {
           setProducts((current) => editing ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved]);
@@ -102,7 +103,7 @@ export function CatalogManager({ categories, initialProducts, ingredients, initi
   async function remove(product: AdminProduct) {
     if (!confirm(`Удалить «${product.name}»? Это действие нельзя отменить.`)) return;
     setPendingId(product.id); setError("");
-    const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+    const response = await fetch(withBasePath(`/api/admin/products/${product.id}`), { method: "DELETE" });
     if (response.ok) setProducts((current) => current.filter((item) => item.id !== product.id));
     else setError((await response.json()).error ?? "Не удалось удалить товар.");
     setPendingId(undefined);
@@ -111,7 +112,7 @@ export function CatalogManager({ categories, initialProducts, ingredients, initi
   async function removeImage() {
     if (!editing?.imageUrl) return;
     setSaving(true);
-    const response = await fetch(`/api/admin/products/${editing.id}/image`, { method: "DELETE" });
+    const response = await fetch(withBasePath(`/api/admin/products/${editing.id}/image`), { method: "DELETE" });
     const result = await response.json();
     if (response.ok) { setEditing(result.product); setProducts((current) => current.map((item) => item.id === result.product.id ? result.product : item)); }
     else setError(result.error ?? "Не удалось удалить фото.");

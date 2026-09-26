@@ -55,17 +55,15 @@ docker compose -f docker-compose.prod.yml logs -f app
 
 Production использует отдельный `docker-compose.prod.yml` и готовый образ из `APP_IMAGE`. Контейнер `app` перед каждым запуском автоматически применяет только новые миграции и создаёт пустые базовые настройки доставки, если база новая. Seed и демонстрационные товары автоматически не запускаются.
 
-Готовый Nginx-конфиг находится в `deploy/nginx/sushimi.conf`. При необходимости замените в нём домен, затем установите и включите конфигурацию:
+Production-образ собирается с `basePath=/sushimi`, поэтому витрина доступна по `/sushimi/`, а CRM — по `/sushimi/admin`. Готовый Nginx-фрагмент находится в `deploy/nginx/sushimi.conf`. На сервере с ISPmanager подключите его к уже существующему виртуальному хосту `olddays.ru`:
 
 ```bash
-cp deploy/nginx/sushimi.conf /etc/nginx/sites-available/sushimi
-ln -s /etc/nginx/sites-available/sushimi /etc/nginx/sites-enabled/sushimi
+cp deploy/nginx/sushimi.conf /etc/nginx/vhosts-resources/olddays.ru/sushimi.conf
 nginx -t
 systemctl reload nginx
-certbot --nginx -d sushimitest.ru -d www.sushimitest.ru
 ```
 
-Если порт `3000` занят, измените `APP_PORT` в `.env` и тот же порт в `proxy_pass` Nginx.
+Существующий сертификат `olddays.ru` продолжает использоваться общим виртуальным хостом. WordPress остаётся на `/`, а n8n и CloudBeaver сохраняют свои текущие пути. Если порт `3000` занят, измените `APP_PORT` в `.env` и тот же порт в `proxy_pass` Nginx.
 
 Обновление приложения:
 
@@ -125,4 +123,4 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=100 app
 ```
 
-После проверки нового сервера переключите DNS-запись домена на его IP и установите HTTPS-сертификат через Certbot. Старый сервер не выключайте до проверки сайта, CRM, изображений и создания тестового заказа.
+Если `olddays.ru` уже направлен на новый сервер, менять DNS не требуется. Старый сервер Sushimi не выключайте до проверки `/sushimi/`, `/sushimi/admin`, изображений и создания тестового заказа.

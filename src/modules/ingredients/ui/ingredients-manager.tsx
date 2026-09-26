@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { Calculator, PackagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { withBasePath } from "@/shared/lib/base-path";
 
 type Unit = "g" | "ml" | "pcs";
 type Ingredient = { id: string; name: string; unit: Unit; purchaseQuantity: number; purchasePrice: number; active: boolean; usageCount: number };
@@ -25,7 +26,7 @@ export function IngredientsManager({ initialIngredients }: { initialIngredients:
   async function save(event: FormEvent) {
     event.preventDefault(); setPending(true); setError("");
     const payload = { name: draft.name, unit: draft.unit, purchaseQuantity: Number(draft.purchaseQuantity), purchasePrice: Math.round(Number(draft.purchasePriceRubles.replace(",", ".")) * 100), active: draft.active };
-    const response = await fetch(editing ? `/api/admin/ingredients/${editing.id}` : "/api/admin/ingredients", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const response = await fetch(withBasePath(editing ? `/api/admin/ingredients/${editing.id}` : "/api/admin/ingredients"), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const result = await response.json();
     if (response.ok) { setIngredients((current) => editing ? current.map((item) => item.id === result.ingredient.id ? result.ingredient : item) : [...current, result.ingredient].sort((a, b) => a.name.localeCompare(b.name, "ru"))); setEditing(undefined); }
     else setError(result.error ?? "Не удалось сохранить ингредиент.");
@@ -35,7 +36,7 @@ export function IngredientsManager({ initialIngredients }: { initialIngredients:
   async function remove(ingredient: Ingredient) {
     if (!confirm(`Удалить «${ingredient.name}»?`)) return;
     setError("");
-    const response = await fetch(`/api/admin/ingredients/${ingredient.id}`, { method: "DELETE" });
+    const response = await fetch(withBasePath(`/api/admin/ingredients/${ingredient.id}`), { method: "DELETE" });
     if (response.ok) setIngredients((current) => current.filter((item) => item.id !== ingredient.id));
     else setError((await response.json()).error ?? "Не удалось удалить ингредиент.");
   }

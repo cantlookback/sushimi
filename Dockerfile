@@ -6,7 +6,9 @@ RUN npm ci
 FROM dependencies AS builder
 WORKDIR /app
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_BASE_PATH=/sushimi
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 RUN npm run build
 
 FROM dependencies AS production-dependencies
@@ -14,8 +16,10 @@ RUN npm prune --omit=dev
 
 FROM node:24-alpine AS runner
 WORKDIR /app
+ARG NEXT_PUBLIC_BASE_PATH=/sushimi
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH \
     HOSTNAME=0.0.0.0 \
     PORT=3000
 

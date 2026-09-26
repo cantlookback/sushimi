@@ -1,4 +1,5 @@
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { withBasePath } from "@/shared/lib/base-path";
 
 const bucket = process.env.S3_BUCKET ?? "sushimi-media";
 const client = new S3Client({
@@ -40,5 +41,5 @@ export async function deleteObject(key: string) {
 }
 
 export function mediaUrl(key: string | null) {
-  return key ? `/api/media/${key.split("/").map(encodeURIComponent).join("/")}` : "";
+  return key ? withBasePath(`/api/media/${key.split("/").map(encodeURIComponent).join("/")}`) : "";
 }
