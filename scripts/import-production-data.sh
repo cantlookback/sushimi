@@ -23,9 +23,10 @@ if [ ! -f "$media_archive" ] || [ ! -s "$media_archive" ]; then
 fi
 
 echo "Creating a backup of the current production data..."
+$compose up -d postgres object-storage
 sh scripts/backup.sh
 
-$compose stop app caddy object-storage
+$compose stop app object-storage
 $compose cp "$database_dump" postgres:/tmp/sushimi-import.dump
 $compose exec -T postgres sh -c 'dropdb --if-exists -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB" && pg_restore --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/sushimi-import.dump'
 $compose exec -T postgres rm -f /tmp/sushimi-import.dump
