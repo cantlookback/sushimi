@@ -68,25 +68,34 @@ systemctl reload nginx
 Обновление приложения:
 
 ```bash
-docker compose -f docker-compose.prod.yml pull app
-docker compose -f docker-compose.prod.yml up -d
+sh update_site.sh
 ```
 
-Резервная копия PostgreSQL и загруженных изображений:
+Резервная копия PostgreSQL и изображений создаётся в едином переносимом формате:
 
 ```bash
 sh scripts/backup.sh
 ```
 
-Архивы появятся в `./backups`. Храните их не только на самом сервере.
+Появится каталог `./backups/production-YYYYMMDD-HHMMSS` с файлами `database.dump` и `media.tar.gz`. Изображения экспортируются через S3 API, поэтому резервная копия не зависит от внутреннего формата Docker volume SeaweedFS. Храните копии не только на самом сервере.
 
 ## Перенос локальных данных на сервер
 
-Экспортируйте локальную PostgreSQL-базу и фотографии из корня проекта:
+Полный перенос выполняется одной командой из PowerShell в корне проекта. Она соберёт и опубликует образ, экспортирует данные, отправит необходимые файлы и запустит импорт:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/transfer-to-server.ps1 `
+  -Server root@SERVER_IP `
+  -ConfirmReplace
+```
+
+Если образ уже опубликован, добавьте `-SkipImagePublish`.
+
+Для ручного переноса сначала экспортируйте локальную PostgreSQL-базу и фотографии:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/export-local-data.ps1
-scp -r backups/local-transfer root@SERVER_IP:/home/sushimi/local-transfer
+scp backups/local-transfer/database.dump backups/local-transfer/media.tar.gz root@SERVER_IP:/home/sushimi/local-transfer/
 ```
 
 На сервере выполните импорт:
@@ -98,27 +107,25 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=100 app
 ```
 
-Импорт полностью заменяет production-базу локальной. Перед заменой скрипт автоматически сохраняет текущую базу и медиа в `./backups`. Медиаархив нужен обязательно: без него записи товаров перенесутся, но их фотографии не будут доступны.
+Импорт полностью заменяет production-базу и содержимое S3-бакета локальными данными. Перед заменой скрипт автоматически создаёт совместимую резервную копию в `./backups/before-import-*`.
 
 ## Перенос production на другой сервер
 
-На старом сервере создайте согласованную копию PostgreSQL и фотографий:
+На старом сервере создайте переносимую копию PostgreSQL и фотографий:
 
 ```bash
 cd /home/sushimi
 sh scripts/backup.sh /tmp/sushimi-transfer
-scp -r /tmp/sushimi-transfer root@NEW_SERVER_IP:/home/sushimi/transfer
+scp -r /tmp/sushimi-transfer root@NEW_SERVER_IP:/home/sushimi/
 ```
 
-На новом сервере сначала разместите проект и заполните `.env`, затем поднимите инфраструктуру и восстановите файлы, подставив фактические имена с временной меткой:
+На новом сервере сначала разместите проект и заполните `.env`, затем поднимите инфраструктуру и импортируйте пакет:
 
 ```bash
 cd /home/sushimi
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d postgres object-storage
-sh scripts/restore-production-backup.sh --confirm-replace \
-  transfer/database-YYYYMMDD-HHMMSS.sql.gz \
-  transfer/media-YYYYMMDD-HHMMSS.tar.gz
+sh scripts/import-production-data.sh --confirm-replace /home/sushimi/sushimi-transfer
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=100 app
 ```

@@ -28,11 +28,22 @@ const client = new S3Client({
 });
 
 async function ensureBucket() {
-  try {
-    await client.send(new HeadBucketCommand({ Bucket: bucket }));
-  } catch {
-    await client.send(new CreateBucketCommand({ Bucket: bucket }));
+  let lastError;
+  for (let attempt = 1; attempt <= 30; attempt += 1) {
+    try {
+      await client.send(new HeadBucketCommand({ Bucket: bucket }));
+      return;
+    } catch {
+      try {
+        await client.send(new CreateBucketCommand({ Bucket: bucket }));
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 30) await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
   }
+  throw lastError;
 }
 
 async function listObjects() {

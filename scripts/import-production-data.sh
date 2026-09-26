@@ -24,16 +24,14 @@ fi
 
 echo "Creating a backup of the current production data..."
 $compose up -d postgres
-$compose stop app object-storage
-sh scripts/backup.sh
+sh scripts/backup.sh "./backups/before-import-$(date -u +%Y%m%d-%H%M%S)"
+$compose stop app
 
 $compose cp "$database_dump" postgres:/tmp/sushimi-import.dump
 $compose exec -T postgres sh -c 'dropdb --if-exists -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB" && pg_restore --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/sushimi-import.dump'
 $compose exec -T postgres rm -f /tmp/sushimi-import.dump
 
 $compose up -d object-storage
-echo "Waiting for object storage to become ready..."
-sleep 8
 media_import_dir="$(mktemp -d)"
 trap 'rm -rf "$media_import_dir"' EXIT INT TERM
 tar -xzf "$media_archive" -C "$media_import_dir"
