@@ -32,6 +32,8 @@ $compose exec -T postgres sh -c 'dropdb --if-exists -U "$POSTGRES_USER" "$POSTGR
 $compose exec -T postgres rm -f /tmp/sushimi-import.dump
 
 $compose up -d object-storage
+echo "Waiting for object storage to become ready..."
+sleep 8
 media_import_dir="$(mktemp -d)"
 trap 'rm -rf "$media_import_dir"' EXIT INT TERM
 tar -xzf "$media_archive" -C "$media_import_dir"
