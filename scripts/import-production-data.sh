@@ -23,17 +23,16 @@ if [ ! -f "$media_archive" ] || [ ! -s "$media_archive" ]; then
 fi
 
 echo "Creating a backup of the current production data..."
-$compose up -d postgres object-storage
+$compose up -d postgres
+$compose stop app object-storage
 sh scripts/backup.sh
 
-$compose stop app object-storage
 $compose cp "$database_dump" postgres:/tmp/sushimi-import.dump
 $compose exec -T postgres sh -c 'dropdb --if-exists -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB" && pg_restore --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/sushimi-import.dump'
 $compose exec -T postgres rm -f /tmp/sushimi-import.dump
 
-$compose start object-storage
-$compose cp "$media_archive" object-storage:/tmp/sushimi-media.tar.gz
-$compose exec -T object-storage sh -c 'tar -xzf /tmp/sushimi-media.tar.gz -C /data && rm -f /tmp/sushimi-media.tar.gz'
+$compose run --rm --no-deps -T --entrypoint sh object-storage -c 'find /data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
+$compose run --rm --no-deps -T -v "$media_archive:/tmp/sushimi-media.tar.gz:ro" --entrypoint tar object-storage -xzf /tmp/sushimi-media.tar.gz -C /data
 
 $compose up -d
 echo "Local database and media were imported into production."
