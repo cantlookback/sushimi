@@ -21,19 +21,14 @@ if ($LASTEXITCODE -ne 0) { throw "PostgreSQL export failed." }
 docker @compose cp postgres:/tmp/sushimi-local.dump (Join-Path $resolvedOutput "database.dump")
 if ($LASTEXITCODE -ne 0) { throw "Could not copy PostgreSQL dump." }
 
-docker @compose stop object-storage
-if ($LASTEXITCODE -ne 0) { throw "Could not stop local object storage for a consistent export." }
-try {
-    $mediaArchive = Join-Path $resolvedOutput "media.tar.gz"
-    docker @compose run --rm --no-deps -T --volume "${resolvedOutput}:/transfer" --entrypoint tar object-storage -czf /transfer/media.tar.gz -C /data .
-    if ($LASTEXITCODE -ne 0) { throw "Media export failed." }
-    if (-not (Test-Path -LiteralPath $mediaArchive) -or (Get-Item -LiteralPath $mediaArchive).Length -eq 0) {
-        throw "Media archive was not created or is empty."
-    }
-}
-finally {
-    docker @compose up -d object-storage
-}
+$mediaDirectory = Join-Path $resolvedOutput "media"
+$mediaArchive = Join-Path $resolvedOutput "media.tar.gz"
+node --env-file=.env.local scripts/transfer-media.mjs export $mediaDirectory
+if ($LASTEXITCODE -ne 0) { throw "Media export failed." }
+if (Test-Path -LiteralPath $mediaArchive) { Remove-Item -LiteralPath $mediaArchive -Force }
+tar -czf $mediaArchive -C $mediaDirectory .
+if ($LASTEXITCODE -ne 0) { throw "Could not create media archive." }
+Remove-Item -LiteralPath $mediaDirectory -Recurse -Force
 
 docker @compose exec -T postgres rm -f /tmp/sushimi-local.dump
 
