@@ -2,8 +2,23 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is required");
+function getDatabaseUrl(environment = process.env) {
+  if (environment.DATABASE_URL) return environment.DATABASE_URL;
+
+  if (!environment.POSTGRES_PASSWORD) {
+    throw new Error("DATABASE_URL or POSTGRES_PASSWORD must be configured");
+  }
+
+  const url = new URL("postgresql://localhost");
+  url.hostname = environment.POSTGRES_HOST ?? "localhost";
+  url.port = environment.POSTGRES_PORT ?? "5432";
+  url.username = environment.POSTGRES_USER ?? "sushimi";
+  url.password = environment.POSTGRES_PASSWORD;
+  url.pathname = `/${environment.POSTGRES_DB ?? "sushimi"}`;
+  return url.toString();
+}
+
+const databaseUrl = getDatabaseUrl();
 
 const client = postgres(databaseUrl, { max: 1 });
 try {

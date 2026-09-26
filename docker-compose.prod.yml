@@ -29,7 +29,11 @@ services:
     pull_policy: always
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sushimi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sushimi}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-sushimi}
+      POSTGRES_USER: ${POSTGRES_USER:-sushimi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       S3_ENDPOINT: http://object-storage:8333
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-sushimi-media}
